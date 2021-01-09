@@ -18,6 +18,6 @@ class Game{
         void Initialize(std::pair<int,int> players);
     private:
         
-        bool curretnTurn_;
+        bool currentTurn_;
         std::vector<int> players_;
 };

@@ -11,7 +11,7 @@ add_subdirectory(modules/spdlog)
 
 include_directories("includes")
 
-add_executable(GoServer src/main.cpp src/server.cpp)
+add_executable(GoServer src/main.cpp src/server.cpp src/game.cpp src/NetworkOperations.cpp)
 
 target_link_libraries(GoServer PUBLIC  spdlog::spdlog)
 target_link_libraries(GoServer PUBLIC  spdlog::spdlog)

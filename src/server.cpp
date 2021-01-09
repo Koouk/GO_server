@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <ctime>
 #include <thread>
+#include <unistd.h>
 
 #include "game.hpp"
 #include "NetworkOperations.hpp"

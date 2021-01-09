@@ -1,0 +1,6 @@
+/home/olek/Desktop/newProject/GO_server/CMakeFiles/rebuild_cache.dir
+/home/olek/Desktop/newProject/GO_server/CMakeFiles/edit_cache.dir
+/home/olek/Desktop/newProject/GO_server/CMakeFiles/GoServer.dir
+/home/olek/Desktop/newProject/GO_server/modules/spdlog/CMakeFiles/edit_cache.dir
+/home/olek/Desktop/newProject/GO_server/modules/spdlog/CMakeFiles/rebuild_cache.dir
+/home/olek/Desktop/newProject/GO_server/modules/spdlog/CMakeFiles/spdlog.dir
