@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -DNDEBUG   CMakeFiles/GoServer.dir/src/main.cpp.o CMakeFiles/GoServer.dir/src/server.cpp.o CMakeFiles/GoServer.dir/src/game.cpp.o CMakeFiles/GoServer.dir/src/NetworkOperations.cpp.o  -o GoServer  modules/spdlog/libspdlog.a modules/spdlog/libspdlog.a -lpthread 
