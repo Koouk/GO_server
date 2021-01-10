@@ -18,6 +18,8 @@
 
 void Thread_func(std::pair<int,int> players)
 {
+
+    spdlog::info("Players{} {}\n",players.first,players.second);
     Game* game = new Game();
     game->Initialize(players);
     game->Run();
@@ -109,7 +111,7 @@ void Server::Run() {
 			}	
 		}
         
-      
+
         while(readyPlayers_.size() > 1)
         {
             auto player1 =  readyPlayers_.front();
