@@ -60,7 +60,6 @@ bool Server::Initialize() {
     
     fdMax_ = sfd_;
     currentGames_ = 0;
-	//FD_ZERO(&mainMask_);
     FD_ZERO(&mainMaskW_);
     FD_ZERO(&mainMaskR_);
     return(EXIT_SUCCESS);   
@@ -80,11 +79,12 @@ void Server::Run() {
     while(1) { 
 		temp_rmask = mainMaskR_;
 		temp_wmask = mainMaskW_;
+        mainMask_ = mainMaskW_;
 		FD_SET(sfd_, &temp_rmask);
 
 		timeout.tv_sec = 5 * 60;
 		timeout.tv_usec = 0;
-		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, (fd_set*)0, &timeout);
+		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, &mainMask_, &timeout);
 		if (rc == 0) {
 		    spdlog::info("Timed out\n");
 		    continue;
@@ -102,13 +102,20 @@ void Server::Run() {
 
 		for (auto &i : clients_) { 
 		    if(FD_ISSET(i,&temp_rmask)){
+                spdlog::info("Ten kient jest do odczytu {} ",i);
 		        HandleRead(i);
 
 		  }
 		  else if (FD_ISSET(i, &temp_wmask)) {
+              
+               spdlog::info("Ten kient jest do zapisu8 {} ",i);
                 HandleWrite(i);
                 
 			}	
+            else if(FD_ISSET(i,&mainMask_))
+            {
+                spdlog::info("Ten kient ma errro {} ",i);
+            }
 		}
         
 
@@ -116,6 +123,11 @@ void Server::Run() {
         {
             auto player1 =  readyPlayers_.front();
             readyPlayers_.pop_front();
+            if(!FD_ISSET(player1,&temp_wmask))
+            {
+                
+                continue;
+            }
             auto player2 =  readyPlayers_.front();
             readyPlayers_.pop_front();
             CreateNewGame(player1, player2);
@@ -138,28 +150,35 @@ void Server::HandleRead(int client)
     }
     else if(data.Type == "error")
     {
+        
         RemoveClient(client);
-        int index = 0;
-        for(; index<readyPlayers_.size();index++)
-        {
-            if(readyPlayers_[index] == client)
-                break;
-        }
-        readyPlayers_.erase(readyPlayers_.begin() + index);
         close(client);
     }
 }
 
 void Server::HandleWrite(int client)
 {
+    for(auto i : readyPlayers_)
+    {
+        if(i == client)
+        return;
+    }
     readyPlayers_.push_back(client);
-    FD_CLR(client,&mainMaskW_);
+    //FD_CLR(client,&mainMaskW_);
 
 }
 
 void Server::RemoveClient(int client)
 {
     clients_.erase(client);
+    int index = 0;
+    for(; index<readyPlayers_.size();index++)
+    {
+        if(readyPlayers_[index] == client)
+            break;
+    }
+    if(index < readyPlayers_.size())
+        readyPlayers_.erase(readyPlayers_.begin() + index);
 	FD_CLR(client, &mainMaskW_);
     FD_CLR(client, &mainMaskR_);
 	if (client == fdMax_)
@@ -181,8 +200,6 @@ void Server::CreateNewGame(int player1, int player2)
     if(!network::SendData("found", "black", player2))
     {
         end = true;
-        network::ReadData(player1);
-        network::SendData("error","error",player1);
     }
     RemoveClient(player1);
     RemoveClient(player2);
@@ -190,6 +207,7 @@ void Server::CreateNewGame(int player1, int player2)
     {
         close(player1);
         close(player2);
+        return;
     }
     try{
         currentGames_++;   

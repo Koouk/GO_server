@@ -7,7 +7,7 @@
 class Server{
 
     public:
-        Server(int port = 1024) : port_(port) {};
+        Server(int port = 10024) : port_(port) {};
         ~Server() {}; 
 
         void Run();
@@ -26,6 +26,6 @@ class Server{
         int sfd_, port_, fdMax_;
         std::atomic <int> currentGames_;  
         const int connectionQueue_ = 5;
-        const int maxSimultanousGames_ = 10;
+        const int maxSimultanousGames_ = 8;
 
 };

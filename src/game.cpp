@@ -117,12 +117,12 @@ void Game::FinalizeGame()
         if(error_ == 1) {
         spdlog::info("Wysylam dane o bledzie{}, {}",players_[0], players_[1]);
         SendResults("error","opponent",players_[0]);
-        SendResults("error","you",players_[1]);
+        SendResults("error","error",players_[1]);
         }
         else
         {
         SendResults("error","opponent",players_[1 ]);
-        SendResults("error","you",players_[0]);
+        SendResults("error","error",players_[0]);
         }
         
         return;

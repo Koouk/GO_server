@@ -38,7 +38,9 @@ bool SendData(std::string type, std::string message, int client)
     json j = data;
     std::string conv_json = j.dump() + "\n"; 
     int n = conv_json.size();
-    const char *buffer = conv_json.c_str();
+    char buffer[1024];
+    for (int i = 0; i < sizeof(conv_json) || i < 1024; i++) 
+        buffer[i] = conv_json[i];
     spdlog::info("Data to send: {}",conv_json);
     int out = 0;
 	do { 
@@ -49,6 +51,7 @@ bool SendData(std::string type, std::string message, int client)
             return false;
 		out += sb;
 	}while( out < n );
+    
     return true;
     }catch(const std::exception&){
 
@@ -64,6 +67,7 @@ DataTemplate ReadData(int client)
     char buffer[1024];
     DataTemplate error{"error","error"};
 
+    try{
 	while(loop) {
 	int rb =  read(client, buffer + inp , 1024 -inp);
     spdlog::info("Read loo[]: {}",rb);
@@ -86,6 +90,10 @@ DataTemplate ReadData(int client)
     json j = json::parse(rec_data);
     spdlog::info("Recieived data: {}",rec_data);
     return j.get<DataTemplate>();
+    }catch(const std::exception&){
+
+        return error;
+    }
 }
 
 }
