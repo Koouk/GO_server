@@ -18,8 +18,14 @@ void Game::Initialize(std::pair<int,int> players)
     gameStatus_ = true;
     pass_ = false;
     winner_ =  0;
+    error_ = 0;
 }
-
+inline void Game::SetError(int player)
+{
+    gameStatus_ = false;
+    error_ = player + 1;
+    
+}
 
 void Game::Run()
 {
@@ -34,21 +40,25 @@ void Game::Run()
     delete board_;
 }
 
+
 void Game::UpdateGame()
 {
     auto move = network::ReadData(players_[currentTurn_]);
-    
+    spdlog::info("Move {} ",move.Type);
     if(move.Type == "move")
         if(board_->ProcessMove(ToPair(move.Data), (PlayerColor)currentTurn_))
         {
             pass_ = false;
-            network::SendData("move","accepted",players_[currentTurn_]);
-            network::SendData("move",move.Data,players_[currentTurn_ ^ 1]);
+            if(!network::SendData("move","accepted",players_[currentTurn_]))
+                SetError(currentTurn_);
+            if(!network::SendData("move",move.Data,players_[currentTurn_ ^ 1]))
+                SetError(currentTurn_ ^ 1);
             currentTurn_ ^=1;
         }
         else
         {
-            network::SendData("move","wrong",players_[currentTurn_]);
+            if(!network::SendData("move","wrong",players_[currentTurn_]))
+                SetError(currentTurn_);
         }
         
     else if(move.Type == "button")
@@ -57,14 +67,18 @@ void Game::UpdateGame()
         {
             if(pass_) {
                 gameStatus_ = false;
-                network::SendData("end","pass",players_[currentTurn_]);
-                network::SendData("end","pass",players_[currentTurn_ ^ 1]);
+                if(!network::SendData("end","pass",players_[currentTurn_]))
+                    SetError(currentTurn_);
+                if(!network::SendData("end","pass",players_[currentTurn_ ^ 1]))
+                    SetError(currentTurn_ ^ 1);
             }
             else
             {
                 pass_ = true;
-                network::SendData("button","accepted",players_[currentTurn_]);
-                network::SendData("button","pass",players_[currentTurn_ ^ 1]);
+                if(!network::SendData("button","accepted",players_[currentTurn_]))
+                    SetError(currentTurn_);
+                if(!network::SendData("button","pass",players_[currentTurn_ ^ 1]))
+                    SetError(currentTurn_ ^ 1);
             }
             currentTurn_ ^=1;
         }
@@ -73,16 +87,31 @@ void Game::UpdateGame()
             gameStatus_ = false;
             winner_ = currentTurn_ ^ 1;
             winner_+= 1;
-            network::SendData("end","resign",players_[currentTurn_]);
-            network::SendData("end","resign",players_[currentTurn_ ^ 1]);
+            if(!network::SendData("end","resign",players_[currentTurn_]))
+                SetError(currentTurn_);
+            if(!network::SendData("end","resign",players_[currentTurn_ ^ 1]))
+                SetError(currentTurn_ ^ 1);
             
         }
+    }
+    else if(move.Type == "error")
+    {
+        SetError(currentTurn_);
     }
 }
 
 
+
+
 void Game::FinalizeGame()
 {
+    if(error_)
+    {
+        error_--;
+        SendResults("error","you",players_[error_ ]);
+        SendResults("error","opponent",players_[(error_ ) ^ 1]);
+
+    }
     if(winner_)
     {   
         winner_ -= 1;
@@ -114,7 +143,7 @@ void Game::FinalizeGame()
 void Game::SendResults(std::string type, std::string data, int client)   //to zrobic w watku przerywanym po x sekundach
 {
     auto rcv = network::ReadData(client);
-    while(rcv.Type != "request" && rcv.Data != "results")
+    while(rcv.Type != "request" && rcv.Data != "results" && rcv.Type != "error")
     {
         rcv = network::ReadData(client);
     }
