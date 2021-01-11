@@ -7,6 +7,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <future>
+#include <thread>
+#include <chrono>
+
 #include "json.hpp"
 #include "spdlog/spdlog.h"
 #include "NetworkOperations.hpp"
@@ -17,7 +21,10 @@ using nlohmann::json;
 
 namespace network{
 
-struct DataTemplate; 
+struct DataTemplate {
+    std::string Type;
+    std::string Data;
+};
 
 void to_json(json& j, const DataTemplate& p) {
         j = json{{"Type", p.Type}, {"Data", p.Data}};

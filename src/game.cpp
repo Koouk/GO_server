@@ -1,9 +1,14 @@
+#include <string>
+#include <unistd.h>
+#include <future>
+#include <thread>
+#include <chrono>
+
 #include "game.hpp"
 #include "NetworkOperations.hpp"
 #include "spdlog/spdlog.h"
 #include "board.hpp"
-#include <string>
-#include <unistd.h>
+
 
 void Game::Initialize(std::pair<int,int> players)
 {
