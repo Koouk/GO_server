@@ -13,7 +13,7 @@
 void Game::Initialize(std::pair<int,int> players)
 {
     players_ = {players.first,players.second};
-    currentTurn_ = PlayerColor::white;
+    currentTurn_ = PlayerColor::black;
     board_ = new Board();
     gameStatus_ = true;
     pass_ = false;
@@ -23,7 +23,7 @@ void Game::Initialize(std::pair<int,int> players)
 inline void Game::SetError(int player)
 {
     gameStatus_ = false;
-    error_ = player + 1;
+    error_ = std::min(player + 1,2);
     
 }
 
@@ -37,6 +37,7 @@ void Game::Run()
 
     close(players_[0]);
     close(players_[1]);
+    spdlog::info("Koncze gre");
     delete board_;
 }
 
@@ -53,6 +54,8 @@ void Game::UpdateGame()
                 SetError(currentTurn_);
             if(!network::SendData("move",move.Data,players_[currentTurn_ ^ 1]))
                 SetError(currentTurn_ ^ 1);
+
+            spdlog::info("wyslano");
             currentTurn_ ^=1;
         }
         else
@@ -98,8 +101,9 @@ void Game::UpdateGame()
     {
         error_ = currentTurn_ + 1;
         gameStatus_ = false;
-        if(!network::SendData("end","error",players_[currentTurn_ ^ 1]))
-        SetError(currentTurn_);
+        network::SendData("end","error",players_[currentTurn_ ^ 1]);
+        network::SendData("end","error",players_[currentTurn_ ]);
+        spdlog::info("Wyslalem dane o bledzie{}",currentTurn_ ^ 1);
     }
 }
 
@@ -110,8 +114,17 @@ void Game::FinalizeGame()
 {
     if(error_)
     {
-        auto tmp = error_ - 1;
-        SendResults("error","opponent",players_[(tmp ) ^ 1]);
+        if(error_ == 1) {
+        spdlog::info("Wysylam dane o bledzie{}, {}",players_[0], players_[1]);
+        SendResults("error","opponent",players_[0]);
+        SendResults("error","you",players_[1]);
+        }
+        else
+        {
+        SendResults("error","opponent",players_[1 ]);
+        SendResults("error","you",players_[0]);
+        }
+        
         return;
 
     }
@@ -119,7 +132,7 @@ void Game::FinalizeGame()
     {   
         winner_ -= 1;
         SendResults("victory","resign",players_[winner_]);
-        SendResults("defeat","resign",players_[(winner_ ) ^ 1]);
+        SendResults("defeat","resign",players_[ (winner_^ 1 ) ]);
 
     }else {
             auto result = board_->GetResult();

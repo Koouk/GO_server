@@ -24,6 +24,7 @@ void Thread_func(std::pair<int,int> players, std::atomic<int>& current_games)
     game.Initialize(players);
     game.Run();
     current_games--;
+    spdlog::info("curretnt games: {}",current_games);
 }
 
 
@@ -114,10 +115,11 @@ void Server::Run() {
         while(readyPlayers_.size() > 1 && currentGames_ < maxSimultanousGames_)
         {
             auto player1 =  readyPlayers_.front();
-            readyPlayers_.pop();
+            readyPlayers_.pop_front();
             auto player2 =  readyPlayers_.front();
-            readyPlayers_.pop();
+            readyPlayers_.pop_front();
             CreateNewGame(player1, player2);
+
         }
 
 	}
@@ -134,11 +136,23 @@ void Server::HandleRead(int client)
         FD_CLR(client,&mainMaskR_);
         FD_SET(client,&mainMaskW_);
     }
+    else if(data.Type == "error")
+    {
+        RemoveClient(client);
+        int index = 0;
+        for(; index<readyPlayers_.size();index++)
+        {
+            if(readyPlayers_[index] == client)
+                break;
+        }
+        readyPlayers_.erase(readyPlayers_.begin() + index);
+        close(client);
+    }
 }
 
 void Server::HandleWrite(int client)
 {
-    readyPlayers_.push(client);
+    readyPlayers_.push_back(client);
     FD_CLR(client,&mainMaskW_);
 
 }
@@ -155,16 +169,28 @@ void Server::RemoveClient(int client)
 
 void Server::CreateNewGame(int player1, int player2)
 {
-
+    bool end = false;
      std::srand(std::time(nullptr));
      if( rand() % 2 )
         std::swap(player1, player2);
 
-    network::SendData("found", "white", player1);
-    network::SendData("found", "black", player2);
-
+    if(!network::SendData("found", "white", player1))
+    {
+        end = true;
+    }
+    if(!network::SendData("found", "black", player2))
+    {
+        end = true;
+        network::ReadData(player1);
+        network::SendData("error","error",player1);
+    }
     RemoveClient(player1);
     RemoveClient(player2);
+    if(end)
+    {
+        close(player1);
+        close(player2);
+    }
     try{
         currentGames_++;   
         std::thread thr(Thread_func, std::pair<int,int>(player1,player2), std::ref(currentGames_));

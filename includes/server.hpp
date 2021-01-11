@@ -1,7 +1,7 @@
 #pragma once
 
 #include <unordered_set>
-#include <queue>
+#include <deque>
 #include <atomic>
 
 class Server{
@@ -21,7 +21,7 @@ class Server{
 
         fd_set mainMask_,mainMaskR_, mainMaskW_;
         std::unordered_set <int> clients_; 
-        std::queue <int> readyPlayers_;
+        std::deque  <int> readyPlayers_;
 
         int sfd_, port_, fdMax_;
         std::atomic <int> currentGames_;  

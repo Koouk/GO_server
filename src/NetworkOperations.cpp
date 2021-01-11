@@ -33,21 +33,27 @@ void from_json(const json& j, DataTemplate& p) {
 
 bool SendData(std::string type, std::string message, int client)
 {
+    try{
     DataTemplate data {type, message};
     json j = data;
     std::string conv_json = j.dump() + "\n"; 
     int n = conv_json.size();
     const char *buffer = conv_json.c_str();
-
     spdlog::info("Data to send: {}",conv_json);
     int out = 0;
 	do { 
+        spdlog::info("Im about to send data to {}",client);
 		int sb = write(client, buffer + out, n - out );
-        if(sb == 0)
+        spdlog::info("Sending loo[]: {}",sb);
+        if(sb <= 0)
             return false;
 		out += sb;
 	}while( out < n );
     return true;
+    }catch(const std::exception&){
+
+        return false;
+    }
 }
 
 DataTemplate ReadData(int client)
@@ -60,7 +66,8 @@ DataTemplate ReadData(int client)
 
 	while(loop) {
 	int rb =  read(client, buffer + inp , 1024 -inp);
-    if(rb == 0)
+    spdlog::info("Read loo[]: {}",rb);
+    if(rb <= 0)
     { 
         return error;
     }
