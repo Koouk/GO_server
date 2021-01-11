@@ -34,7 +34,7 @@ void Game::UpdateGame()
     auto move = network::ReadData(players_[currentTurn_]);
     
     if(move.Type == "move")
-        if(board_->ProcessMove())
+        if(board_->ProcessMove(ToPair(move.Data), (PlayerColor)currentTurn_))
         {
             pass_ = false;
             network::SendData("move","accepted",players_[currentTurn_]);
@@ -114,4 +114,28 @@ void Game::SendResults(std::string type, std::string data, int client)   //to zr
         rcv = network::ReadData(client);
     }
     network::SendData(type,data,client);
+}
+
+
+std::pair<int,int> Game::ToPair(std::string move)
+{
+    std::string delimiter = " ";
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = move.find (delimiter, pos_start)) != std::string::npos) {
+        token = move.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (move.substr (pos_start));
+    for(auto i : res)
+     
+    if(res.size() > 1)
+    {
+        return {std::stoi( res[0] ), std::stoi( res[1] )};
+    }
+    return {-1, -1};
 }

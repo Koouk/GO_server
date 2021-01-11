@@ -18,6 +18,7 @@ class Game{
         void UpdateGame();
         void FinalizeGame();
         void SendResults(std::string type, std::string data, int client);
+        std::pair<int,int> ToPair(std::string move);
 
         Board* board_;
         bool currentTurn_, gameStatus_, pass_ ;
