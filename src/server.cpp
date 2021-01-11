@@ -16,16 +16,14 @@
 #include "NetworkOperations.hpp"
 #include "spdlog/spdlog.h"
 
-void Thread_func(std::pair<int,int> players)
+void Thread_func(std::pair<int,int> players, std::atomic<int>& current_games)
 {
 
     spdlog::info("Players{} {}\n",players.first,players.second);
-    Game* game = new Game();
-    game->Initialize(players);
-    game->Run();
-    delete game;
-
-    // currentGames--; z mutexem
+    Game game;
+    game.Initialize(players);
+    game.Run();
+    current_games--;
 }
 
 
@@ -60,6 +58,7 @@ bool Server::Initialize() {
     }
     
     fdMax_ = sfd_;
+    currentGames_ = 0;
 	//FD_ZERO(&mainMask_);
     FD_ZERO(&mainMaskW_);
     FD_ZERO(&mainMaskR_);
@@ -112,7 +111,7 @@ void Server::Run() {
 		}
         
 
-        while(readyPlayers_.size() > 1)
+        while(readyPlayers_.size() > 1 && currentGames_ < maxSimultanousGames_)
         {
             auto player1 =  readyPlayers_.front();
             readyPlayers_.pop();
@@ -167,8 +166,8 @@ void Server::CreateNewGame(int player1, int player2)
     RemoveClient(player1);
     RemoveClient(player2);
     try{
-        currentGames_++;   //mutex
-        std::thread thr(Thread_func, std::pair<int,int>(player1,player2));
+        currentGames_++;   
+        std::thread thr(Thread_func, std::pair<int,int>(player1,player2), std::ref(currentGames_));
 	    thr.detach();
     }catch (std::system_error &e)
     {

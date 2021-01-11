@@ -7,6 +7,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <future>
+#include <thread>
+#include <chrono>
+
 #include "json.hpp"
 #include "spdlog/spdlog.h"
 #include "NetworkOperations.hpp"
@@ -17,8 +21,7 @@ using nlohmann::json;
 
 namespace network{
 
-struct DataTemplate; 
-
+struct DataTemplate;
 void to_json(json& j, const DataTemplate& p) {
         j = json{{"Type", p.Type}, {"Data", p.Data}};
     }
@@ -28,7 +31,7 @@ void from_json(const json& j, DataTemplate& p) {
     j.at("Data").get_to(p.Data);
 }
 
-void SendData(std::string type, std::string message, int client)
+bool SendData(std::string type, std::string message, int client)
 {
     DataTemplate data {type, message};
     json j = data;
@@ -40,8 +43,11 @@ void SendData(std::string type, std::string message, int client)
     int out = 0;
 	do { 
 		int sb = write(client, buffer + out, n - out );
+        if(sb == 0)
+            return false;
 		out += sb;
 	}while( out < n );
+    return true;
 }
 
 DataTemplate ReadData(int client)
@@ -50,9 +56,14 @@ DataTemplate ReadData(int client)
 	int inp = 0;
 	bool loop = true;
     char buffer[1024];
-     
+    DataTemplate error{"error","error"};
+
 	while(loop) {
 	int rb =  read(client, buffer + inp , 1024 -inp);
+    if(rb == 0)
+    { 
+        return error;
+    }
 	for( int in = inp; in<  inp + rb; in++)
     { 
 		if(buffer[in] == '\n' ){

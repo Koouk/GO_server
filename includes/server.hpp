@@ -2,7 +2,7 @@
 
 #include <unordered_set>
 #include <queue>
-
+#include <atomic>
 
 class Server{
 
@@ -24,7 +24,7 @@ class Server{
         std::queue <int> readyPlayers_;
 
         int sfd_, port_, fdMax_;
-        int currentGames_ = 0;   //dodac mutexy pozniej
+        std::atomic <int> currentGames_;  
         const int connectionQueue_ = 5;
         const int maxSimultanousGames_ = 10;
 

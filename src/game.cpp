@@ -1,9 +1,14 @@
+#include <string>
+#include <unistd.h>
+#include <future>
+#include <thread>
+#include <chrono>
+
 #include "game.hpp"
 #include "NetworkOperations.hpp"
 #include "spdlog/spdlog.h"
 #include "board.hpp"
-#include <string>
-#include <unistd.h>
+
 
 void Game::Initialize(std::pair<int,int> players)
 {
@@ -13,8 +18,14 @@ void Game::Initialize(std::pair<int,int> players)
     gameStatus_ = true;
     pass_ = false;
     winner_ =  0;
+    error_ = 0;
 }
-
+inline void Game::SetError(int player)
+{
+    gameStatus_ = false;
+    error_ = player + 1;
+    
+}
 
 void Game::Run()
 {
@@ -29,21 +40,25 @@ void Game::Run()
     delete board_;
 }
 
+
 void Game::UpdateGame()
 {
     auto move = network::ReadData(players_[currentTurn_]);
-    
+    spdlog::info("Move {} ",move.Type);
     if(move.Type == "move")
         if(board_->ProcessMove(ToPair(move.Data), (PlayerColor)currentTurn_))
         {
             pass_ = false;
-            network::SendData("move","accepted",players_[currentTurn_]);
-            network::SendData("move",move.Data,players_[currentTurn_ ^ 1]);
+            if(!network::SendData("move","accepted",players_[currentTurn_]))
+                SetError(currentTurn_);
+            if(!network::SendData("move",move.Data,players_[currentTurn_ ^ 1]))
+                SetError(currentTurn_ ^ 1);
             currentTurn_ ^=1;
         }
         else
         {
-            network::SendData("move","wrong",players_[currentTurn_]);
+            if(!network::SendData("move","wrong",players_[currentTurn_]))
+                SetError(currentTurn_);
         }
         
     else if(move.Type == "button")
@@ -52,14 +67,18 @@ void Game::UpdateGame()
         {
             if(pass_) {
                 gameStatus_ = false;
-                network::SendData("end","pass",players_[currentTurn_]);
-                network::SendData("end","pass",players_[currentTurn_ ^ 1]);
+                if(!network::SendData("end","pass",players_[currentTurn_]))
+                    SetError(currentTurn_);
+                if(!network::SendData("end","pass",players_[currentTurn_ ^ 1]))
+                    SetError(currentTurn_ ^ 1);
             }
             else
             {
                 pass_ = true;
-                network::SendData("button","accepted",players_[currentTurn_]);
-                network::SendData("button","pass",players_[currentTurn_ ^ 1]);
+                if(!network::SendData("button","accepted",players_[currentTurn_]))
+                    SetError(currentTurn_);
+                if(!network::SendData("button","pass",players_[currentTurn_ ^ 1]))
+                    SetError(currentTurn_ ^ 1);
             }
             currentTurn_ ^=1;
         }
@@ -68,16 +87,34 @@ void Game::UpdateGame()
             gameStatus_ = false;
             winner_ = currentTurn_ ^ 1;
             winner_+= 1;
-            network::SendData("end","resign",players_[currentTurn_]);
-            network::SendData("end","resign",players_[currentTurn_ ^ 1]);
+            if(!network::SendData("end","resign",players_[currentTurn_]))
+                SetError(currentTurn_);
+            if(!network::SendData("end","resign",players_[currentTurn_ ^ 1]))
+                SetError(currentTurn_ ^ 1);
             
         }
+    }
+    else if(move.Type == "error")
+    {
+        error_ = currentTurn_ + 1;
+        gameStatus_ = false;
+        if(!network::SendData("end","error",players_[currentTurn_ ^ 1]))
+        SetError(currentTurn_);
     }
 }
 
 
+
+
 void Game::FinalizeGame()
 {
+    if(error_)
+    {
+        auto tmp = error_ - 1;
+        SendResults("error","opponent",players_[(tmp ) ^ 1]);
+        return;
+
+    }
     if(winner_)
     {   
         winner_ -= 1;
@@ -109,7 +146,7 @@ void Game::FinalizeGame()
 void Game::SendResults(std::string type, std::string data, int client)   //to zrobic w watku przerywanym po x sekundach
 {
     auto rcv = network::ReadData(client);
-    while(rcv.Type != "request" && rcv.Data != "results")
+    while(rcv.Type != "request" && rcv.Data != "results" && rcv.Type != "error")
     {
         rcv = network::ReadData(client);
     }
