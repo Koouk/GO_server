@@ -7,9 +7,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <future>
 #include <thread>
-#include <chrono>
 
 #include "json.hpp"
 #include "spdlog/spdlog.h"
@@ -41,12 +39,10 @@ bool SendData(std::string type, std::string message, int client)
     char buffer[1024];
     for (int i = 0; i < sizeof(conv_json) || i < 1024; i++) 
         buffer[i] = conv_json[i];
-    spdlog::info("Data to send: {}",conv_json);
+    spdlog::info("Data to send: {} to {}",conv_json, client);
     int out = 0;
 	do { 
-        spdlog::info("Im about to send data to {}",client);
 		int sb = write(client, buffer + out, n - out );
-        spdlog::info("Sending loo[]: {}",sb);
         if(sb <= 0)
             return false;
 		out += sb;
@@ -70,7 +66,6 @@ DataTemplate ReadData(int client)
     try{
 	while(loop) {
 	int rb =  read(client, buffer + inp , 1024 -inp);
-    spdlog::info("Read loo[]: {}",rb);
     if(rb <= 0)
     { 
         return error;
@@ -88,7 +83,7 @@ DataTemplate ReadData(int client)
 
     std::string rec_data(buffer);
     json j = json::parse(rec_data);
-    spdlog::info("Recieived data: {}",rec_data);
+    spdlog::info("Recieived data: {} from: {}",rec_data), client;
     return j.get<DataTemplate>();
     }catch(const std::exception&){
 

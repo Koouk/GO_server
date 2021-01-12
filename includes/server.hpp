@@ -20,7 +20,7 @@ class Server{
         void CreateNewGame(int player1, int player2);
 
         fd_set mainMask_,mainMaskR_, mainMaskW_;
-        std::unordered_set <int> clients_; 
+        std::unordered_set <int> clients_, toRemove_, responed_; 
         std::deque  <int> readyPlayers_;
 
         int sfd_, port_, fdMax_;

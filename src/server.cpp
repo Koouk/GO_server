@@ -8,9 +8,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <ctime>
 #include <thread>
 #include <unistd.h>
+#include <unordered_set>
 
 #include "game.hpp"
 #include "NetworkOperations.hpp"
@@ -18,19 +18,15 @@
 
 void Thread_func(std::pair<int,int> players, std::atomic<int>& current_games)
 {
-
-    spdlog::info("Players{} {}\n",players.first,players.second);
     Game game;
     game.Initialize(players);
     game.Run();
     current_games--;
-    spdlog::info("curretnt games: {}",current_games);
+    spdlog::info("Current games: {}",current_games);
 }
-
 
 bool Server::Initialize() {
     int on = 1;
-
     sockaddr_in saddr;
     saddr.sin_family = AF_INET;
 	saddr.sin_addr.s_addr = INADDR_ANY;
@@ -58,13 +54,13 @@ bool Server::Initialize() {
         return(EXIT_FAILURE);
     }
     
+    responed_.clear();
     fdMax_ = sfd_;
     currentGames_ = 0;
     FD_ZERO(&mainMaskW_);
     FD_ZERO(&mainMaskR_);
     return(EXIT_SUCCESS);   
 }
-
 
 
 void Server::Run() {
@@ -79,12 +75,11 @@ void Server::Run() {
     while(1) { 
 		temp_rmask = mainMaskR_;
 		temp_wmask = mainMaskW_;
-        mainMask_ = mainMaskW_;
 		FD_SET(sfd_, &temp_rmask);
 
 		timeout.tv_sec = 5 * 60;
 		timeout.tv_usec = 0;
-		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, &mainMask_, &timeout);
+		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, (fd_set *)0, &timeout);
 		if (rc == 0) {
 		    spdlog::info("Timed out\n");
 		    continue;
@@ -95,49 +90,43 @@ void Server::Run() {
 		    cfd = accept(sfd_, (struct sockaddr*)&c_addr, &slt);
 		    spdlog::info("new connection: {}\n", inet_ntoa((struct in_addr)c_addr.sin_addr));
 		    FD_SET(cfd, &mainMaskR_);
+            FD_SET(cfd, &mainMaskW_);
+            clients_.insert(cfd);
 		    if (cfd > fdMax_) 
                 fdMax_ = cfd;
-            clients_.insert(cfd);
+            
 		}
-
 		for (auto &i : clients_) { 
 		    if(FD_ISSET(i,&temp_rmask)){
-                spdlog::info("Ten kient jest do odczytu {} ",i);
 		        HandleRead(i);
 
 		  }
-		  else if (FD_ISSET(i, &temp_wmask)) {
-              
-               spdlog::info("Ten kient jest do zapisu8 {} ",i);
+		   if (FD_ISSET(i, &temp_wmask)) {
                 HandleWrite(i);
                 
 			}	
-            else if(FD_ISSET(i,&mainMask_))
-            {
-                spdlog::info("Ten kient ma errro {} ",i);
-            }
 		}
         
+        for( auto i : toRemove_)
+        {
+            RemoveClient(i);
+            close(i);
+            spdlog::info("Usunieto: {}", i);
 
+        }
+        toRemove_.clear();
         while(readyPlayers_.size() > 1 && currentGames_ < maxSimultanousGames_)
         {
             auto player1 =  readyPlayers_.front();
             readyPlayers_.pop_front();
-            if(!FD_ISSET(player1,&temp_wmask))
-            {
-                
-                continue;
-            }
             auto player2 =  readyPlayers_.front();
             readyPlayers_.pop_front();
             CreateNewGame(player1, player2);
 
         }
-
 	}
 	close(sfd_);
 }
-
 
 
 void Server::HandleRead(int client)
@@ -145,32 +134,31 @@ void Server::HandleRead(int client)
     auto data = network::ReadData(client);
     if(data.Type == "lobby" && data.Data == "ready")
     {
-        FD_CLR(client,&mainMaskR_);
-        FD_SET(client,&mainMaskW_);
+        responed_.insert(client);
     }
     else if(data.Type == "error")
     {
-        
-        RemoveClient(client);
-        close(client);
+        toRemove_.insert(client);
     }
 }
 
 void Server::HandleWrite(int client)
 {
+    if(!responed_.count(client))
+        return;
     for(auto i : readyPlayers_)
     {
         if(i == client)
         return;
     }
     readyPlayers_.push_back(client);
-    //FD_CLR(client,&mainMaskW_);
 
 }
 
 void Server::RemoveClient(int client)
 {
     clients_.erase(client);
+    responed_.erase(client);
     int index = 0;
     for(; index<readyPlayers_.size();index++)
     {
