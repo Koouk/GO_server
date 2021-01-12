@@ -8,9 +8,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <ctime>
 #include <thread>
 #include <unistd.h>
+#include <unordered_set>
 
 #include "game.hpp"
 #include "NetworkOperations.hpp"
@@ -18,19 +18,15 @@
 
 void Thread_func(std::pair<int,int> players, std::atomic<int>& current_games)
 {
-
-    spdlog::info("Players{} {}\n",players.first,players.second);
     Game game;
     game.Initialize(players);
     game.Run();
     current_games--;
-    spdlog::info("curretnt games: {}",current_games);
+    spdlog::info("Current games: {}",current_games);
 }
-
 
 bool Server::Initialize() {
     int on = 1;
-
     sockaddr_in saddr;
     saddr.sin_family = AF_INET;
 	saddr.sin_addr.s_addr = INADDR_ANY;
@@ -58,14 +54,13 @@ bool Server::Initialize() {
         return(EXIT_FAILURE);
     }
     
+    responed_.clear();
     fdMax_ = sfd_;
     currentGames_ = 0;
-	//FD_ZERO(&mainMask_);
     FD_ZERO(&mainMaskW_);
     FD_ZERO(&mainMaskR_);
     return(EXIT_SUCCESS);   
 }
-
 
 
 void Server::Run() {
@@ -84,7 +79,7 @@ void Server::Run() {
 
 		timeout.tv_sec = 5 * 60;
 		timeout.tv_usec = 0;
-		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, (fd_set*)0, &timeout);
+		rc = select(fdMax_ + 1, &temp_rmask, &temp_wmask, (fd_set *)0, &timeout);
 		if (rc == 0) {
 		    spdlog::info("Timed out\n");
 		    continue;
@@ -95,23 +90,31 @@ void Server::Run() {
 		    cfd = accept(sfd_, (struct sockaddr*)&c_addr, &slt);
 		    spdlog::info("new connection: {}\n", inet_ntoa((struct in_addr)c_addr.sin_addr));
 		    FD_SET(cfd, &mainMaskR_);
+            FD_SET(cfd, &mainMaskW_);
+            clients_.insert(cfd);
 		    if (cfd > fdMax_) 
                 fdMax_ = cfd;
-            clients_.insert(cfd);
+            
 		}
-
 		for (auto &i : clients_) { 
 		    if(FD_ISSET(i,&temp_rmask)){
 		        HandleRead(i);
 
 		  }
-		  else if (FD_ISSET(i, &temp_wmask)) {
+		   if (FD_ISSET(i, &temp_wmask)) {
                 HandleWrite(i);
                 
 			}	
 		}
         
+        for( auto i : toRemove_)
+        {
+            RemoveClient(i);
+            close(i);
+            spdlog::info("Usunieto: {}", i);
 
+        }
+        toRemove_.clear();
         while(readyPlayers_.size() > 1 && currentGames_ < maxSimultanousGames_)
         {
             auto player1 =  readyPlayers_.front();
@@ -121,11 +124,9 @@ void Server::Run() {
             CreateNewGame(player1, player2);
 
         }
-
 	}
 	close(sfd_);
 }
-
 
 
 void Server::HandleRead(int client)
@@ -133,33 +134,39 @@ void Server::HandleRead(int client)
     auto data = network::ReadData(client);
     if(data.Type == "lobby" && data.Data == "ready")
     {
-        FD_CLR(client,&mainMaskR_);
-        FD_SET(client,&mainMaskW_);
+        responed_.insert(client);
     }
     else if(data.Type == "error")
     {
-        RemoveClient(client);
-        int index = 0;
-        for(; index<readyPlayers_.size();index++)
-        {
-            if(readyPlayers_[index] == client)
-                break;
-        }
-        readyPlayers_.erase(readyPlayers_.begin() + index);
-        close(client);
+        toRemove_.insert(client);
     }
 }
 
 void Server::HandleWrite(int client)
 {
+    if(!responed_.count(client))
+        return;
+    for(auto i : readyPlayers_)
+    {
+        if(i == client)
+        return;
+    }
     readyPlayers_.push_back(client);
-    FD_CLR(client,&mainMaskW_);
 
 }
 
 void Server::RemoveClient(int client)
 {
     clients_.erase(client);
+    responed_.erase(client);
+    int index = 0;
+    for(; index<readyPlayers_.size();index++)
+    {
+        if(readyPlayers_[index] == client)
+            break;
+    }
+    if(index < readyPlayers_.size())
+        readyPlayers_.erase(readyPlayers_.begin() + index);
 	FD_CLR(client, &mainMaskW_);
     FD_CLR(client, &mainMaskR_);
 	if (client == fdMax_)
@@ -181,8 +188,6 @@ void Server::CreateNewGame(int player1, int player2)
     if(!network::SendData("found", "black", player2))
     {
         end = true;
-        network::ReadData(player1);
-        network::SendData("error","error",player1);
     }
     RemoveClient(player1);
     RemoveClient(player2);
@@ -190,6 +195,7 @@ void Server::CreateNewGame(int player1, int player2)
     {
         close(player1);
         close(player2);
+        return;
     }
     try{
         currentGames_++;   

@@ -37,7 +37,7 @@ void Game::Run()
 
     close(players_[0]);
     close(players_[1]);
-    spdlog::info("Koncze gre");
+    spdlog::info("Ending game");
     delete board_;
 }
 
@@ -45,7 +45,6 @@ void Game::Run()
 void Game::UpdateGame()
 {
     auto move = network::ReadData(players_[currentTurn_]);
-    spdlog::info("Move {} ",move.Type);
     if(move.Type == "move")
         if(board_->ProcessMove(ToPair(move.Data), (PlayerColor)currentTurn_))
         {
@@ -55,7 +54,6 @@ void Game::UpdateGame()
             if(!network::SendData("move",move.Data,players_[currentTurn_ ^ 1]))
                 SetError(currentTurn_ ^ 1);
 
-            spdlog::info("wyslano");
             currentTurn_ ^=1;
         }
         else
@@ -102,8 +100,7 @@ void Game::UpdateGame()
         error_ = currentTurn_ + 1;
         gameStatus_ = false;
         network::SendData("end","error",players_[currentTurn_ ^ 1]);
-        network::SendData("end","error",players_[currentTurn_ ]);
-        spdlog::info("Wyslalem dane o bledzie{}",currentTurn_ ^ 1);
+        spdlog::info("Sending error information{}",currentTurn_ ^ 1);
     }
 }
 
@@ -115,14 +112,14 @@ void Game::FinalizeGame()
     if(error_)
     {
         if(error_ == 1) {
-        spdlog::info("Wysylam dane o bledzie{}, {}",players_[0], players_[1]);
+        spdlog::info("Sending error information{}, {}",players_[0], players_[1]);
         SendResults("error","opponent",players_[0]);
-        SendResults("error","you",players_[1]);
+        
         }
         else
         {
         SendResults("error","opponent",players_[1 ]);
-        SendResults("error","you",players_[0]);
+       
         }
         
         return;
