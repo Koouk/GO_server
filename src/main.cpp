@@ -1,19 +1,16 @@
 #include "server.hpp"
-
+#include <memory>
 
 int main(int argc, char *argv[])
 {
-    Server* server;
+    std::unique_ptr<Server> server;
     if(argc > 0)
-        server = new Server(atoi(argv[1]));
+        server =  std::make_unique<Server>(atoi(argv[1]));
     else
     {
-        server = new Server();
+        server =std::make_unique<Server>();
     }
-    
     server->Run();
 
-    
-    delete server;
     return 0;
 }
